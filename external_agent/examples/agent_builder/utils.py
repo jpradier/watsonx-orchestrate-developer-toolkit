@@ -66,7 +66,10 @@ def get_llm_sync(messages: List[Message]) -> list[Message]:
     """
     logger.info("wx.ai deployment Synchronous call")
     client = _get_wxai_client()
-    payload = {"messages": [m.model_dump() for m in messages if m.role != "system"]}
+
+    last_user_message = next((m for m in reversed(messages) if m.role == "user"), None)
+    payload = {"messages": [last_user_message.model_dump(exclude_defaults=True, exclude_unset=True)]} if last_user_message else {"messages": []}
+
     logger.info(f"Calling AI service with payload: {payload}")
     result = client.deployments.run_ai_service(WATSONX_DEPLOYMENT_ID, payload)
     if "error" in result:
@@ -99,11 +102,11 @@ async def get_llm_stream(messages: List[Message], thread_id: str):
     """
     logger.info("wx.ai deployment streaming call start")
     client = _get_wxai_client()
-    for m in messages:
-        if m.role == "system":
-            m.role = "assistant"
-    payload = {"messages": [m.model_dump(exclude_defaults=True, exclude_unset=True) for m in messages]
-        }
+
+    last_user_message = next((m for m in reversed(messages) if m.role == "user"), None)
+
+    payload = {"messages": [last_user_message.model_dump(exclude_defaults=True, exclude_unset=True)]} if last_user_message else {"messages": []}
+
     logger.info(f"wx.ai deployment streaming call payload {payload}")
     try:
         for chunk in client.deployments.run_ai_service_stream(
